@@ -334,6 +334,19 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// デフォルトのSheetを取る
+	DefaultSheets = make([]Sheet, 0, 1000)
+	for _, rank := range []string{"A", "B", "C", "S"} {
+		c := SheetConfigs[rank]
+		for num := int64(1); num <= c.Count; num++ {
+			DefaultSheets = append(DefaultSheets, Sheet{
+				ID: c.ID + num - 1,
+				Rank: rank,
+				Num: num,
+				Price: c.Price,
+			})
+		}
+	}
 
 	e := echo.New()
 	funcs := template.FuncMap{
@@ -666,13 +679,18 @@ func main() {
 			return resError(c, "invalid_rank", 404)
 		}
 
-		var sheet Sheet
-		if err := db.QueryRow("SELECT * FROM sheets WHERE `rank` = ? AND num = ?", rank, num).Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
-			if err == sql.ErrNoRows {
-				return resError(c, "invalid_sheet", 404)
-			}
-			return err
+
+		sc, ok := SheetConfigs[rank]
+		if !ok {
+			return resError(c, "invalid_sheet", 404)
 		}
+
+		numInt, _ := strconv.ParseInt(num, 10, 64)
+
+		if sc.Count < numInt {
+			return resError(c, "invalid_sheet", 404)
+		}
+		sheetId := sc.ID + numInt - 1
 
 		tx, err := db.Begin()
 		if err != nil {
@@ -680,7 +698,7 @@ func main() {
 		}
 
 		var reservation Reservation
-		if err := tx.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id HAVING reserved_at = MIN(reserved_at) FOR UPDATE", event.ID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt); err != nil {
+		if err := tx.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id HAVING reserved_at = MIN(reserved_at) FOR UPDATE", event.ID, sheetId).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt); err != nil {
 			tx.Rollback()
 			if err == sql.ErrNoRows {
 				return resError(c, "not_reserved", 400)
