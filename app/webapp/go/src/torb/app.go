@@ -274,18 +274,17 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 		var reservationNULL ReservationNULL
 		err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price, &reservationNULL.ID, &reservationNULL.EventID, &reservationNULL.SheetID, &reservationNULL.UserID, &reservationNULL.ReservedAt, &reservationNULL.CanceledAt)
 
-		if err == nil {
-			if reservationNULL.ID != nil {
-				reservation.ID = *reservationNULL.ID
-				reservation.EventID = *reservationNULL.EventID
-				reservation.SheetID = *reservationNULL.SheetID
-				reservation.UserID = *reservationNULL.ID
-				reservation.ReservedAt = reservationNULL.ReservedAt
-				reservation.CanceledAt = reservationNULL.CanceledAt
-			}
+		if reservationNULL.ID != nil {
+			reservation.ID = *reservationNULL.ID
+			reservation.EventID = *reservationNULL.EventID
+			reservation.SheetID = *reservationNULL.SheetID
+			reservation.UserID = *reservationNULL.ID
+			reservation.ReservedAt = reservationNULL.ReservedAt
+			reservation.CanceledAt = reservationNULL.CanceledAt
 			sheet.Mine = reservation.UserID == loginUserID
 			sheet.Reserved = true
 			sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
+
 		} else if err == sql.ErrNoRows {
 			event.Remains++
 			event.Sheets[sheet.Rank].Remains++
