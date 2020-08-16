@@ -9,8 +9,6 @@ gogo:
 	sudo systemctl start h2o
 	sleep 3
 	./app/exec_bench.sh
-	$(MAKE) kataribe
-	$(MAKE) slow-log
 
 kataribe:
 	sudo cat /var/log/h2o/access.log | ./kataribe 
