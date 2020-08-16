@@ -19,4 +19,4 @@ mysql -uisucon torb -e 'ALTER TABLE reservations DROP KEY event_id_and_sheet_id_
 gzip -dc "$DB_DIR/isucon8q-initial-dataset.sql.gz" | mysql -uisucon torb
 mysql -uisucon torb -e 'ALTER TABLE reservations ADD KEY event_id_and_sheet_id_idx (event_id, sheet_id)'
 mysql -uisucon torb -e 'ALTER TABLE reservations ADD KEY (user_id)'
-mysql -uisucon torb -e 'CREATE INDEX reservations_sheet_id_event_id_and_canceled_at_idx ON reservations (sheet_id,event_id,canceled_at)'
+mysql -uisucon torb -e 'CREATE INDEX reservations_event_id_and_canceled_at_sheet_id_idx ON reservations (event_id,canceled_at,sheet_id)'
