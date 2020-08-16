@@ -91,13 +91,13 @@ type SheetConfig struct {
 }
 
 var SheetConfigs map[string]SheetConfig = map[string]SheetConfig{
-	"S": SheetConfig{1, 50, 5000},
 	"A": SheetConfig{51, 150, 3000},
 	"B": SheetConfig{201, 300, 1000},
 	"C": SheetConfig{501, 500, 0},
+	"S": SheetConfig{1, 50, 5000},
 }
 
-var DefaultSheets []Sheet
+var DefaultSheets []*Sheet
 
 func sessUserID(c echo.Context) int64 {
 	sess, _ := session.Get("session", c)
@@ -335,11 +335,11 @@ func main() {
 		log.Fatal(err)
 	}
 	// デフォルトのSheetを取る
-	DefaultSheets = make([]Sheet, 0, 1000)
+	DefaultSheets = make([]*Sheet, 0, 1000)
 	for _, rank := range []string{"A", "B", "C", "S"} {
 		c := SheetConfigs[rank]
 		for num := int64(1); num <= c.Count; num++ {
-			DefaultSheets = append(DefaultSheets, Sheet{
+			DefaultSheets = append(DefaultSheets, &Sheet{
 				ID: c.ID + num - 1,
 				Rank: rank,
 				Num: num,
