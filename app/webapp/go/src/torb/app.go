@@ -77,6 +77,22 @@ type Reservation struct {
 	CanceledAtUnix int64  `json:"canceled_at,omitempty"`
 }
 
+type ReservationNULL struct {
+	ID         *int64     `json:"id"`
+	EventID    *int64     `json:"-"`
+	SheetID    *int64     `json:"-"`
+	UserID     *int64     `json:"-"`
+	ReservedAt *time.Time `json:"-"`
+	CanceledAt *time.Time `json:"-"`
+
+	Event          *Event  `json:"event,omitempty"`
+	SheetRank      *string `json:"sheet_rank,omitempty"`
+	SheetNum       *int64  `json:"sheet_num,omitempty"`
+	Price          *int64  `json:"price,omitempty"`
+	ReservedAtUnix *int64  `json:"reserved_at,omitempty"`
+	CanceledAtUnix *int64  `json:"canceled_at,omitempty"`
+}
+
 type Administrator struct {
 	ID        int64  `json:"id,omitempty"`
 	Nickname  string `json:"nickname,omitempty"`
@@ -232,8 +248,21 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 		"B": &Sheets{},
 		"C": &Sheets{},
 	}
+	q := `
+	SELECT s.id, s.rank, s.num, s.price, r.id, r.event_id, r.sheet_id, r.user_id, r.reserved_at, r.canceled_at
+	FROM sheets s 
+	left join (
+		SELECT * 
+		FROM reservations
+		WHERE event_id = ?
+		AND canceled_at IS NULL 
+		GROUP BY event_id, sheet_id 
+		HAVING reserved_at = MIN(reserved_at)
+	) r on s.id = r.sheet_id
+	ORDER BY s.rank, s.num 
+	`
 
-	rows, err := db.Query("SELECT * FROM sheets ORDER BY `rank`, num")
+	rows, err := db.Query(q, event.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -241,25 +270,32 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 
 	for rows.Next() {
 		var sheet Sheet
-		if err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
-			return nil, err
-		}
-		event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
-		event.Total++
-		event.Sheets[sheet.Rank].Total++
-
 		var reservation Reservation
-		err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
-		if err == nil {
-			sheet.Mine = reservation.UserID == loginUserID
+		var reservationNULL ReservationNULL
+		err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price, &reservationNULL.ID, &reservationNULL.EventID, &reservationNULL.SheetID, &reservationNULL.UserID, &reservationNULL.ReservedAt, &reservationNULL.CanceledAt)
+
+		if reservationNULL.ID != nil {
+			reservation.ID = *reservationNULL.ID
+			reservation.EventID = *reservationNULL.EventID
+			reservation.SheetID = *reservationNULL.SheetID
+			reservation.UserID = *reservationNULL.UserID
+			reservation.ReservedAt = reservationNULL.ReservedAt
+			reservation.CanceledAt = reservationNULL.CanceledAt
+			sheet.Mine = *reservationNULL.UserID == loginUserID
 			sheet.Reserved = true
 			sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
+
 		} else if err == sql.ErrNoRows {
 			event.Remains++
 			event.Sheets[sheet.Rank].Remains++
 		} else {
 			return nil, err
 		}
+		sheet.Mine = false
+		sheet.Reserved = false
+		event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
+		event.Total++
+		event.Sheets[sheet.Rank].Total++
 
 		event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
 	}
