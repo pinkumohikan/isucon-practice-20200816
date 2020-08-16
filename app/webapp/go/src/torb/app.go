@@ -77,6 +77,22 @@ type Reservation struct {
 	CanceledAtUnix int64  `json:"canceled_at,omitempty"`
 }
 
+type ReservationNULL struct {
+	ID         *int64     `json:"id"`
+	EventID    *int64     `json:"-"`
+	SheetID    *int64     `json:"-"`
+	UserID     *int64     `json:"-"`
+	ReservedAt *time.Time `json:"-"`
+	CanceledAt *time.Time `json:"-"`
+
+	Event          *Event  `json:"event,omitempty"`
+	SheetRank      *string `json:"sheet_rank,omitempty"`
+	SheetNum       *int64  `json:"sheet_num,omitempty"`
+	Price          *int64  `json:"price,omitempty"`
+	ReservedAtUnix *int64  `json:"reserved_at,omitempty"`
+	CanceledAtUnix *int64  `json:"canceled_at,omitempty"`
+}
+
 type Administrator struct {
 	ID        int64  `json:"id,omitempty"`
 	Nickname  string `json:"nickname,omitempty"`
@@ -255,13 +271,18 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 	for rows.Next() {
 		var sheet Sheet
 		var reservation Reservation
-		var err error
-		if rows.Scan(&reservation.ID) == nil {
-			err = rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price)
-		} else {
-			err = rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price, &reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
-		}
+		var reservationNULL ReservationNULL
+		err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price, &reservationNULL.ID, &reservationNULL.EventID, &reservationNULL.SheetID, &reservationNULL.UserID, &reservationNULL.ReservedAt, &reservationNULL.CanceledAt)
+
 		if err == nil {
+			if reservationNULL.ID != nil {
+				reservation.ID = *reservationNULL.ID
+				reservation.EventID = *reservationNULL.EventID
+				reservation.SheetID = *reservationNULL.SheetID
+				reservation.UserID = *reservationNULL.ID
+				reservation.ReservedAt = reservationNULL.ReservedAt
+				reservation.CanceledAt = reservationNULL.CanceledAt
+			}
 			sheet.Mine = reservation.UserID == loginUserID
 			sheet.Reserved = true
 			sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
