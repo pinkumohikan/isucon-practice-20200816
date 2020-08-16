@@ -254,25 +254,57 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 			Rank: s.Rank,
 			Num: s.Num,
 			Price: s.Price,
-		}
-		event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
-		event.Total++
-		event.Sheets[sheet.Rank].Total++
 
-		var reservation Reservation
-		err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
-		if err == nil {
-			sheet.Mine = reservation.UserID == loginUserID
-			sheet.Reserved = true
-			sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
-		} else if err == sql.ErrNoRows {
-			event.Remains++
-			event.Sheets[sheet.Rank].Remains++
-		} else {
+		}
+ 		event.Total++
+		event.Sheets[sheet.Rank].Total++
+		event.Sheets[sheet.Rank].Remains++
+		event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
+		event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
+	}
+
+	event.Remains = event.Total
+
+	rows, err := db.Query("SELECT id, event_id, sheet_id, user_id, reserved_at FROM reservations WHERE event_id = ? AND canceled_at IS NULL GROUP BY sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var rs []Reservation
+	for rows.Next() {
+		var r Reservation
+		if err := rows.Scan(&r.ID, &r.EventID, &r.SheetID, &r.UserID, &r.ReservedAt); err != nil {
 			return nil, err
 		}
+		rs = append(rs, r)
+	}
+	_ = rows.Close()
 
-		event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
+	for _, r := range rs {
+		var sheet Sheet
+		for _, s := range sheets {
+			if s.ID == r.SheetID {
+				sheet = s
+				break
+			}
+		}
+
+		sheet.Mine = r.UserID == loginUserID
+		sheet.Reserved = true
+		sheet.ReservedAtUnix = r.ReservedAt.Unix()
+
+		event.Remains--
+		event.Sheets[sheet.Rank].Remains--
+
+		var detail []*Sheet
+		for _, d := range event.Sheets[sheet.Rank].Detail {
+			if d.ID == sheet.ID {
+				detail = append(detail, &sheet)
+			} else {
+				detail = append(detail, d)
+			}
+		}
+		event.Sheets[sheet.Rank].Detail = detail
 	}
 
 	return &event, nil
@@ -320,9 +352,6 @@ func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Con
 var db *sql.DB
 
 func main() {
-	initProfiler()
-	initTrace()
-
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4&interpolateParams=true",
 		os.Getenv("DB_USER"), os.Getenv("DB_PASS"),
 		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"),
@@ -330,7 +359,7 @@ func main() {
 	)
 
 	var err error
-	db, err = sql.Open(tracedDriver("mysql"), dsn)
+	db, err = sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
