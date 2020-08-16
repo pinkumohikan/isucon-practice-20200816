@@ -246,7 +246,9 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 		}
 		sheets = append(sheets, sheet)
  		event.Total++
+		event.Sheets[sheet.Rank].Total++
 		event.Sheets[sheet.Rank].Remains++
+		event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
 	}
 	_ = rows.Close()
 
@@ -282,9 +284,7 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 
 		event.Remains--
 		event.Sheets[sheet.Rank].Remains--
-		event.Sheets[sheet.Rank].Total++
 		event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
-		event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
 	}
 
 	return &event, nil
