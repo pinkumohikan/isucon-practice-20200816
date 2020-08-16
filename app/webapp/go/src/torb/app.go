@@ -235,7 +235,6 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 	q := `
 	SELECT * 
 	FROM sheets s 
-	ORDER BY rank, num 
 	left join (
 		SELECT * 
 		FROM reservations
@@ -244,6 +243,7 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 		GROUP BY event_id, sheet_id 
 		HAVING reserved_at = MIN(reserved_at)
 	) r on s.id = r.sheet_id
+	ORDER BY s.rank, s.num 
 	`
 
 	rows, err := db.Query(q, event.ID)
