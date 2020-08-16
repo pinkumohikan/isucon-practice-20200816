@@ -282,9 +282,9 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 
 	for _, r := range rs {
 		var sheet Sheet
-		for _, s := range sheets {
+		for _, s := range DefaultSheets {
 			if s.ID == r.SheetID {
-				sheet = s
+				sheet = *s
 				break
 			}
 		}
