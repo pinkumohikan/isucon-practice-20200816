@@ -8,9 +8,10 @@ gogo:
 	-sudo truncate --size 0 /var/lib/mysql/mysql-slow.log
 	make -C app/webapp/go build
 	sudo systemctl start mariadb
+	sleep 2
 	sudo systemctl start torb.go
 	sudo systemctl start h2o
-	sleep 3
+	sleep 2
 	./app/exec_bench.sh
 
 kataribe:
