@@ -84,16 +84,21 @@ type Administrator struct {
 	PassHash  string `json:"pass_hash,omitempty"`
 }
 
-func sessUserID(c echo.Context) int64 {
+func sessUserData(c echo.Context) (int64, string) {
 	sess, _ := session.Get("session", c)
-	var userID int64
+	var user_id int64
+	var nickname string
 	if x, ok := sess.Values["user_id"]; ok {
-		userID, _ = x.(int64)
+		user_id, _ = x.(int64)
 	}
-	return userID
+	if x, ok := sess.Values["nickname"]; ok {
+		nickname, _ = x.(string)
+	}
+
+	return user_id, nickname
 }
 
-func sessSetUserID(c echo.Context, id int64) {
+func sessSetUser(c echo.Context, id int64, nickname string) {
 	sess, _ := session.Get("session", c)
 	sess.Options = &sessions.Options{
 		Path:     "/",
@@ -101,6 +106,7 @@ func sessSetUserID(c echo.Context, id int64) {
 		HttpOnly: true,
 	}
 	sess.Values["user_id"] = id
+	sess.Values["nickname"] = nickname
 	sess.Save(c.Request(), c.Response())
 }
 
@@ -165,12 +171,17 @@ func adminLoginRequired(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func getLoginUser(c echo.Context) (*User, error) {
-	userID := sessUserID(c)
-	if userID == 0 {
+	var user User
+	uid, nickname = sessUserData(c)
+	if uid == 0 {
 		return nil, errors.New("not logged in")
 	}
-	var user User
-	err := db.QueryRow("SELECT id, nickname FROM users WHERE id = ?", userID).Scan(&user.ID, &user.Nickname)
+	user := &User{
+		ID:       uid.(int),
+		Nickname: nickname.(string),
+	}
+	var err error
+	err = nil
 	return &user, err
 }
 
@@ -528,7 +539,7 @@ func main() {
 			return resError(c, "authentication_failed", 401)
 		}
 
-		sessSetUserID(c, user.ID)
+		sessSetUser(c, user.ID, user.Nickname)
 		user, err = getLoginUser(c)
 		if err != nil {
 			return err
