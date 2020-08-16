@@ -310,6 +310,9 @@ func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Con
 var db *sql.DB
 
 func main() {
+	initProfiler()
+	initTrace()
+
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
 		os.Getenv("DB_USER"), os.Getenv("DB_PASS"),
 		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"),
@@ -317,7 +320,7 @@ func main() {
 	)
 
 	var err error
-	db, err = sql.Open("mysql", dsn)
+	db, err = sql.Open(tracedDriver("mysql"), dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
