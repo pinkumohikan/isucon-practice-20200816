@@ -281,7 +281,7 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 			reservation.UserID = *reservationNULL.UserID
 			reservation.ReservedAt = reservationNULL.ReservedAt
 			reservation.CanceledAt = reservationNULL.CanceledAt
-			sheet.Mine = reservation.UserID == loginUserID
+			sheet.Mine = *reservationNULL.UserID == loginUserID
 			sheet.Reserved = true
 			sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
 
