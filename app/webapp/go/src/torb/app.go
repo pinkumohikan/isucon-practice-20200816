@@ -313,7 +313,7 @@ func main() {
 	initProfiler()
 	initTrace()
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4&interpolateParams=true",
 		os.Getenv("DB_USER"), os.Getenv("DB_PASS"),
 		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"),
 		os.Getenv("DB_DATABASE"),
