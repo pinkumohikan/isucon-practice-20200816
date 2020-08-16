@@ -84,6 +84,21 @@ type Administrator struct {
 	PassHash  string `json:"pass_hash,omitempty"`
 }
 
+type SheetConfig struct {
+	ID int64
+	Count int64
+	Price int64
+}
+
+var SheetConfigs map[string]SheetConfig = map[string]SheetConfig{
+	"S": SheetConfig{1, 50, 5000},
+	"A": SheetConfig{51, 150, 3000},
+	"B": SheetConfig{201, 300, 1000},
+	"C": SheetConfig{501, 500, 0},
+}
+
+var DefaultSheets []Sheet
+
 func sessUserID(c echo.Context) int64 {
 	sess, _ := session.Get("session", c)
 	var userID int64
@@ -233,16 +248,12 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 		"C": &Sheets{},
 	}
 
-	rows, err := db.Query("SELECT * FROM sheets ORDER BY `rank`, num")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var sheet Sheet
-		if err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
-			return nil, err
+	for _, s := range DefaultSheets {
+		var sheet = Sheet{
+			ID: s.ID,
+			Rank: s.Rank,
+			Num: s.Num,
+			Price: s.Price,
 		}
 		event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
 		event.Total++
@@ -294,9 +305,8 @@ func fillinAdministrator(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func validateRank(rank string) bool {
-	var count int
-	db.QueryRow("SELECT COUNT(*) FROM sheets WHERE `rank` = ?", rank).Scan(&count)
-	return count > 0
+	_, ok := SheetConfigs[rank]
+	return ok
 }
 
 type Renderer struct {
