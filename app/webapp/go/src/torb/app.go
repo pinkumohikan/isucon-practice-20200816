@@ -433,14 +433,23 @@ func main() {
 				return err
 			}
 
-			event, err := getEvent(reservation.EventID, -1)
+			e, err := getEvent(reservation.EventID, -1)
 			if err != nil {
 				return err
 			}
-			price := event.Sheets[sheet.Rank].Price
-			event.Sheets = nil
-			event.Total = 0
-			event.Remains = 0
+			events = append(events, e)
+
+			price := e.Sheets[sheet.Rank].Price
+			event := &Event{
+				ID:       e.ID,
+				Title:    e.Title,
+				PublicFg: e.PublicFg,
+				ClosedFg: e.ClosedFg,
+				Price:    e.Price,
+				Total:    0,
+				Remains:  0,
+				Sheets:   nil,
+			}
 
 			reservation.Event = event
 			reservation.SheetRank = sheet.Rank
@@ -451,7 +460,6 @@ func main() {
 				reservation.CanceledAtUnix = reservation.CanceledAt.Unix()
 			}
 			recentReservations = append(recentReservations, reservation)
-			events = append(events, event)
 		}
 		if recentReservations == nil {
 			recentReservations = make([]Reservation, 0)
@@ -475,18 +483,8 @@ func main() {
 				return err
 			}
 
-			for _, exists := range events {
-				if exists.ID == eventID {
-					e := &Event{
-						ID:       exists.ID,
-						Title:    exists.Title,
-						PublicFg: exists.PublicFg,
-						ClosedFg: exists.ClosedFg,
-						Price:    exists.Price,
-						Total:    exists.Total,
-						Remains:  exists.Remains,
-						Sheets:   exists.Sheets,
-					}
+			for _, e := range events {
+				if e.ID == eventID {
 					for k := range e.Sheets {
 						e.Sheets[k].Detail = nil
 					}
