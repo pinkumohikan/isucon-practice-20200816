@@ -250,6 +250,8 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 	}
 	_ = rows.Close()
 
+	event.Remains = event.Total
+
 	rows, err = db.Query("SELECT id, event_id, sheet_id, user_id, reserved_at FROM reservations WHERE event_id = ? AND canceled_at IS NULL GROUP BY sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID)
 	if err != nil {
 		return nil, err
