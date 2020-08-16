@@ -1,4 +1,4 @@
-.PHONY: gogo kataribe
+.PHONY: gogo kataribe slow-log
 
 gogo:
 	sudo systemctl stop h2o
@@ -10,7 +10,11 @@ gogo:
 	sleep 3
 	./app/exec_bench.sh
 	$(MAKE) kataribe
+	$(MAKE) slow-log
 
 kataribe:
 	sudo cat /var/log/h2o/access.log | ./kataribe 
+
+slow-log:
+	sudo mysqldumpslow -s at -t 10 /var/lib/mysql/mysql-slow.log
 
