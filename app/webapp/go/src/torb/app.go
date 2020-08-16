@@ -278,7 +278,7 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 			reservation.ID = *reservationNULL.ID
 			reservation.EventID = *reservationNULL.EventID
 			reservation.SheetID = *reservationNULL.SheetID
-			reservation.UserID = *reservationNULL.ID
+			reservation.UserID = *reservationNULL.UserID
 			reservation.ReservedAt = reservationNULL.ReservedAt
 			reservation.CanceledAt = reservationNULL.CanceledAt
 			sheet.Mine = reservation.UserID == loginUserID
@@ -291,6 +291,8 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 		} else {
 			return nil, err
 		}
+		sheet.Mine = false
+		sheet.Reserved = false
 		event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
 		event.Total++
 		event.Sheets[sheet.Rank].Total++
