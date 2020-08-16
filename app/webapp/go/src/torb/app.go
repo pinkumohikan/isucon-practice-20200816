@@ -172,17 +172,13 @@ func adminLoginRequired(next echo.HandlerFunc) echo.HandlerFunc {
 
 func getLoginUser(c echo.Context) (*User, error) {
 	var user User
-	uid, nickname = sessUserData(c)
+	uid, nickname := sessUserData(c)
 	if uid == 0 {
 		return nil, errors.New("not logged in")
 	}
-	user := &User{
-		ID:       uid.(int),
-		Nickname: nickname.(string),
-	}
-	var err error
-	err = nil
-	return &user, err
+	user.ID = uid
+	user.Nickname = nickname
+	return &user, nil
 }
 
 func getLoginAdministrator(c echo.Context) (*Administrator, error) {
