@@ -255,7 +255,12 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 	for rows.Next() {
 		var sheet Sheet
 		var reservation Reservation
-		err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price, &reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
+		var err error
+		if rows.Scan(&reservation.ID) == nil {
+			err = rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price)
+		} else {
+			err = rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price, &reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
+		}
 		if err == nil {
 			sheet.Mine = reservation.UserID == loginUserID
 			sheet.Reserved = true
