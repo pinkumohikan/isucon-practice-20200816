@@ -238,9 +238,8 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 	ORDER BY rank, num 
 	left join (
 		SELECT * 
-		FROM reservations 
-		WHERE event_id = ? 
-		AND sheet_id = s.id
+		FROM reservations
+		WHERE event_id = ?
 		AND canceled_at IS NULL 
 		GROUP BY event_id, sheet_id 
 		HAVING reserved_at = MIN(reserved_at)
