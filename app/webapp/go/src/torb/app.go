@@ -424,6 +424,7 @@ func main() {
 		}
 		defer rows.Close()
 
+		var events []*Event
 		var recentReservations []Reservation
 		for rows.Next() {
 			var reservation Reservation
@@ -450,6 +451,7 @@ func main() {
 				reservation.CanceledAtUnix = reservation.CanceledAt.Unix()
 			}
 			recentReservations = append(recentReservations, reservation)
+			events = append(events, event)
 		}
 		if recentReservations == nil {
 			recentReservations = make([]Reservation, 0)
@@ -472,14 +474,26 @@ func main() {
 			if err := rows.Scan(&eventID); err != nil {
 				return err
 			}
-			event, err := getEvent(eventID, -1)
-			if err != nil {
-				return err
+
+			for _, exists := range events {
+				if exists.ID == eventID {
+					e := &Event{
+						ID:       exists.ID,
+						Title:    exists.Title,
+						PublicFg: exists.PublicFg,
+						ClosedFg: exists.ClosedFg,
+						Price:    exists.Price,
+						Total:    exists.Total,
+						Remains:  exists.Remains,
+						Sheets:   exists.Sheets,
+					}
+					for k := range e.Sheets {
+						e.Sheets[k].Detail = nil
+					}
+					recentEvents = append(recentEvents, e)
+					break
+				}
 			}
-			for k := range event.Sheets {
-				event.Sheets[k].Detail = nil
-			}
-			recentEvents = append(recentEvents, event)
 		}
 		if recentEvents == nil {
 			recentEvents = make([]*Event, 0)
