@@ -84,6 +84,21 @@ type Administrator struct {
 	PassHash  string `json:"pass_hash,omitempty"`
 }
 
+type SheetConfig struct {
+	ID    int64
+	Count int64
+	Price int64
+}
+
+var SheetConfigs map[string]SheetConfig = map[string]SheetConfig{
+	"A": SheetConfig{51, 150, 3000},
+	"B": SheetConfig{201, 300, 1000},
+	"C": SheetConfig{501, 500, 0},
+	"S": SheetConfig{1, 50, 5000},
+}
+
+var DefaultSheets []*Sheet
+
 func sessUserData(c echo.Context) (int64, string) {
 	sess, _ := session.Get("session", c)
 	var user_id int64
@@ -240,35 +255,62 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 		"C": &Sheets{},
 	}
 
-	rows, err := db.Query("SELECT * FROM sheets ORDER BY `rank`, num")
+	for _, s := range DefaultSheets {
+		var sheet = Sheet{
+			ID:    s.ID,
+			Rank:  s.Rank,
+			Num:   s.Num,
+			Price: s.Price,
+		}
+		event.Total++
+		event.Sheets[sheet.Rank].Total++
+		event.Sheets[sheet.Rank].Remains++
+		event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
+		event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
+	}
+
+	event.Remains = event.Total
+
+	rows, err := db.Query("SELECT id, event_id, sheet_id, user_id, reserved_at FROM reservations WHERE event_id = ? AND canceled_at IS NULL GROUP BY sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
+	var rs []Reservation
 	for rows.Next() {
+		var r Reservation
+		if err := rows.Scan(&r.ID, &r.EventID, &r.SheetID, &r.UserID, &r.ReservedAt); err != nil {
+			return nil, err
+		}
+		rs = append(rs, r)
+	}
+	_ = rows.Close()
+
+	for _, r := range rs {
 		var sheet Sheet
-		if err := rows.Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
-			return nil, err
-		}
-		event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
-		event.Total++
-		event.Sheets[sheet.Rank].Total++
-
-		var reservation Reservation
-		err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt)
-		if err == nil {
-			sheet.Mine = reservation.UserID == loginUserID
-			sheet.Reserved = true
-			sheet.ReservedAtUnix = reservation.ReservedAt.Unix()
-		} else if err == sql.ErrNoRows {
-			event.Remains++
-			event.Sheets[sheet.Rank].Remains++
-		} else {
-			return nil, err
+		for _, s := range DefaultSheets {
+			if s.ID == r.SheetID {
+				sheet = *s
+				break
+			}
 		}
 
-		event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
+		sheet.Mine = r.UserID == loginUserID
+		sheet.Reserved = true
+		sheet.ReservedAtUnix = r.ReservedAt.Unix()
+
+		event.Remains--
+		event.Sheets[sheet.Rank].Remains--
+
+		var detail []*Sheet
+		for _, d := range event.Sheets[sheet.Rank].Detail {
+			if d.ID == sheet.ID {
+				detail = append(detail, &sheet)
+			} else {
+				detail = append(detail, d)
+			}
+		}
+		event.Sheets[sheet.Rank].Detail = detail
 	}
 
 	return &event, nil
@@ -301,9 +343,8 @@ func fillinAdministrator(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func validateRank(rank string) bool {
-	var count int
-	db.QueryRow("SELECT COUNT(*) FROM sheets WHERE `rank` = ?", rank).Scan(&count)
-	return count > 0
+	_, ok := SheetConfigs[rank]
+	return ok
 }
 
 type Renderer struct {
@@ -317,9 +358,6 @@ func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Con
 var db *sql.DB
 
 func main() {
-	initProfiler()
-	initTrace()
-
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4&interpolateParams=true",
 		os.Getenv("DB_USER"), os.Getenv("DB_PASS"),
 		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"),
@@ -327,9 +365,22 @@ func main() {
 	)
 
 	var err error
-	db, err = sql.Open(tracedDriver("mysql"), dsn)
+	db, err = sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatal(err)
+	}
+	// デフォルトのSheetを取る
+	DefaultSheets = make([]*Sheet, 0, 1000)
+	for _, rank := range []string{"A", "B", "C", "S"} {
+		c := SheetConfigs[rank]
+		for num := int64(1); num <= c.Count; num++ {
+			DefaultSheets = append(DefaultSheets, &Sheet{
+				ID:    c.ID + num - 1,
+				Rank:  rank,
+				Num:   num,
+				Price: c.Price,
+			})
+		}
 	}
 
 	e := echo.New()
@@ -675,13 +726,17 @@ func main() {
 			return resError(c, "invalid_rank", 404)
 		}
 
-		var sheet Sheet
-		if err := db.QueryRow("SELECT * FROM sheets WHERE `rank` = ? AND num = ?", rank, num).Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
-			if err == sql.ErrNoRows {
-				return resError(c, "invalid_sheet", 404)
-			}
-			return err
+		sc, ok := SheetConfigs[rank]
+		if !ok {
+			return resError(c, "invalid_sheet", 404)
 		}
+
+		numInt, _ := strconv.ParseInt(num, 10, 64)
+
+		if sc.Count < numInt {
+			return resError(c, "invalid_sheet", 404)
+		}
+		sheetId := sc.ID + numInt - 1
 
 		tx, err := db.Begin()
 		if err != nil {
@@ -689,7 +744,7 @@ func main() {
 		}
 
 		var reservation Reservation
-		if err := tx.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id HAVING reserved_at = MIN(reserved_at) FOR UPDATE", event.ID, sheet.ID).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt); err != nil {
+		if err := tx.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id HAVING reserved_at = MIN(reserved_at) FOR UPDATE", event.ID, sheetId).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt); err != nil {
 			tx.Rollback()
 			if err == sql.ErrNoRows {
 				return resError(c, "not_reserved", 400)
