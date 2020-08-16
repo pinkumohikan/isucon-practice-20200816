@@ -285,6 +285,16 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 
 		event.Remains--
 		event.Sheets[sheet.Rank].Remains--
+
+		var detail []*Sheet
+		for _, d := range event.Sheets[sheet.Rank].Detail {
+			if d.ID == sheet.ID {
+				detail = append(detail, &sheet)
+			} else {
+				detail = append(detail, d)
+			}
+		}
+		event.Sheets[sheet.Rank].Detail = detail
 	}
 
 	return &event, nil
