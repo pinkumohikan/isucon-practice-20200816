@@ -55,6 +55,30 @@ regexp = '^(GET|HEAD) /api/users/[0-9]+\b'
 name = "get users"
 
 [[bundle]]
+regexp = 'POST /api/events/[0-9]+/actions/reserve'
+name = "予約"
+
+[[bundle]]
+regexp = 'GET /api/events/[0-9]+'
+name = "イベント詳細"
+
+[[bundle]]
+regexp = 'GET /admin/api/reports/events/[0-9]+/sales'
+name = "admin イベント毎のsalesレポート"
+
+[[bundle]]
+regexp = 'DELETE /api/events/[0-9]+/sheets/[A-Z]/[0-9]+/reservation'
+name = "予約キャンセル"
+
+[[bundle]]
+regexp = 'POST /admin/api/events/[0-9]+/actions/edit'
+name = "admin イベント編集"
+
+[[bundle]]
+regexp = 'GET /admin/api/events/[0-9]+'
+name = "admin イベント詳細"
+
+[[bundle]]
 regexp = '^(GET|HEAD) /stylesheets/'
 name = "stylesheets"
 
