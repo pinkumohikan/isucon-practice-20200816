@@ -1,0 +1,8 @@
+bin
+pkg
+/webapp/go/torb
+.DS_store
+isucon8q-initial-dataset.sql.gz
+/bench/*.json
+/bench/*.log
+./result.json
