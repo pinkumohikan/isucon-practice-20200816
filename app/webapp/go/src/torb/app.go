@@ -233,7 +233,7 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 		"C": &Sheets{},
 	}
 	q := `
-	SELECT * 
+	SELECT s.id, s.rank, s.num, s.price, r.id, r.event_id, r.sheet_id, r.user_id, r.reserved_at, r.canceled_at
 	FROM sheets s 
 	left join (
 		SELECT * 
