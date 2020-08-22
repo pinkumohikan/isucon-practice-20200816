@@ -200,17 +200,10 @@ func getLoginAdministrator(c echo.Context) (*Administrator, error) {
 }
 
 func getEvents(all bool) ([]*Event, error) {
-	tx, err := db.Begin()
+	rows, err := db.Query("SELECT * FROM events ORDER BY id ASC")
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Commit()
-
-	rows, err := tx.Query("SELECT * FROM events ORDER BY id ASC")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
 
 	var events []*Event
 	for rows.Next() {
@@ -223,6 +216,8 @@ func getEvents(all bool) ([]*Event, error) {
 		}
 		events = append(events, &event)
 	}
+	_ = rows.Close()
+
 	for i, v := range events {
 		event, err := getEvent(v.ID, -1)
 		if err != nil {
@@ -423,32 +418,21 @@ func main() {
 		}
 		c.Bind(&params)
 
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-
 		var user User
-		if err := tx.QueryRow("SELECT * FROM users WHERE login_name = ?", params.LoginName).Scan(&user.ID, &user.LoginName, &user.Nickname, &user.PassHash); err != sql.ErrNoRows {
-			tx.Rollback()
+		if err := db.QueryRow("SELECT * FROM users WHERE login_name = ?", params.LoginName).Scan(&user.ID, &user.LoginName, &user.Nickname, &user.PassHash); err != sql.ErrNoRows {
 			if err == nil {
 				return resError(c, "duplicated", 409)
 			}
 			return err
 		}
 
-		res, err := tx.Exec("INSERT INTO users (login_name, pass_hash, nickname) VALUES (?, SHA2(?, 256), ?)", params.LoginName, params.Password, params.Nickname)
+		res, err := db.Exec("INSERT INTO users (login_name, pass_hash, nickname) VALUES (?, SHA2(?, 256), ?)", params.LoginName, params.Password, params.Nickname)
 		if err != nil {
-			tx.Rollback()
 			return resError(c, "", 0)
 		}
 		userID, err := res.LastInsertId()
 		if err != nil {
-			tx.Rollback()
 			return resError(c, "", 0)
-		}
-		if err := tx.Commit(); err != nil {
-			return err
 		}
 
 		return c.JSON(201, echo.Map{
@@ -655,7 +639,7 @@ func main() {
 		var sheet Sheet
 		var reservationID int64
 		for {
-			if err := db.QueryRow("SELECT * FROM sheets WHERE id NOT IN (SELECT sheet_id FROM reservations WHERE event_id = ? AND canceled_at IS NULL FOR UPDATE) AND `rank` = ? ORDER BY RAND() LIMIT 1", event.ID, params.Rank).Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
+			if err := db.QueryRow("SELECT * FROM sheets WHERE id NOT IN (SELECT sheet_id FROM reservations WHERE event_id = ? AND canceled_at IS NULL) AND `rank` = ? ORDER BY RAND() LIMIT 1", event.ID, params.Rank).Scan(&sheet.ID, &sheet.Rank, &sheet.Num, &sheet.Price); err != nil {
 				if err == sql.ErrNoRows {
 					return resError(c, "sold_out", 409)
 				}
@@ -665,6 +649,12 @@ func main() {
 			tx, err := db.Begin()
 			if err != nil {
 				return err
+			}
+			_, err = tx.Exec("SELECT id FROM reservations where id = ? for update", reservationID)
+			if err != nil {
+				tx.Rollback()
+				log.Println("re-try: rollback by", err)
+				continue
 			}
 
 			res, err := tx.Exec("INSERT INTO reservations (event_id, sheet_id, user_id, reserved_at) VALUES (?, ?, ?, ?)", event.ID, sheet.ID, user.ID, time.Now().UTC().Format("2006-01-02 15:04:05.000000"))
@@ -733,22 +723,26 @@ func main() {
 		}
 		sheetId := sc.ID + numInt - 1
 
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-
 		var reservation Reservation
-		if err := tx.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id HAVING reserved_at = MIN(reserved_at) FOR UPDATE", event.ID, sheetId).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt); err != nil {
-			tx.Rollback()
+		if err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id HAVING reserved_at = MIN(reserved_at)", event.ID, sheetId).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt); err != nil {
 			if err == sql.ErrNoRows {
 				return resError(c, "not_reserved", 400)
 			}
 			return err
 		}
 		if reservation.UserID != user.ID {
-			tx.Rollback()
 			return resError(c, "not_permitted", 403)
+		}
+
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Exec("SELECT id FROM reservations where id = ? for update", reservation.ID)
+		if err != nil {
+			tx.Rollback()
+			log.Println("re-try: rollback by", err)
 		}
 
 		if _, err := tx.Exec("UPDATE reservations SET canceled_at = ? WHERE id = ?", time.Now().UTC().Format("2006-01-02 15:04:05.000000"), reservation.ID); err != nil {
@@ -826,22 +820,13 @@ func main() {
 		}
 		c.Bind(&params)
 
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
 
-		res, err := tx.Exec("INSERT INTO events (title, public_fg, closed_fg, price) VALUES (?, ?, 0, ?)", params.Title, params.Public, params.Price)
+		res, err := db.Exec("INSERT INTO events (title, public_fg, closed_fg, price) VALUES (?, ?, 0, ?)", params.Title, params.Public, params.Price)
 		if err != nil {
-			tx.Rollback()
 			return err
 		}
 		eventID, err := res.LastInsertId()
 		if err != nil {
-			tx.Rollback()
-			return err
-		}
-		if err := tx.Commit(); err != nil {
 			return err
 		}
 
