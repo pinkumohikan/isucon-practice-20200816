@@ -227,6 +227,7 @@ func getEvents(all bool) ([]*Event, error) {
 			event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
 			event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
 		}
+		event.Remains = event.Total
 		events = append(events, &event)
 	}
 	_ = rows.Close()
@@ -253,22 +254,22 @@ func getEvents(all bool) ([]*Event, error) {
 	// ここでreservationsができてる
 	_ = rows.Close()
 
-	// detailを作る
-	var detail []*Sheet
+	// detailを作るのをやめた、nil入れてるっぽい
+	// var detail []*Sheet
 	for _, r := range rs {
-		var sheet Sheet
-		for _, s := range DefaultSheets {
-			if s.ID == r.SheetID {
-				sheet = *s
-				break
-			}
-		}
+		// var sheet Sheet
+		// for _, s := range DefaultSheets {
+		// 	if s.ID == r.SheetID {
+		// 		sheet = *s
+		// 		break
+		// 	}
+		// }
 
-		sheet.Mine = r.UserID == -1
-		sheet.Reserved = true
-		sheet.ReservedAtUnix = r.ReservedAt.Unix()
+		// sheet.Mine = r.UserID == -1
+		// sheet.Reserved = true
+		// sheet.ReservedAtUnix = r.ReservedAt.Unix()
 
-		detail = append(detail, &sheet)
+		// detail = append(detail, &sheet)
 
 		for _, e := range events {
 			if e.ID == r.EventID {
