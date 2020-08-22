@@ -207,6 +207,7 @@ func getEventsForAdmin() ([]*Event, error) {
 
 	rows, err := tx.Query("SELECT * FROM events ORDER BY id ASC")
 	if err != nil {
+		_ = tx.Rollback()
 		return nil, err
 	}
 
@@ -221,13 +222,16 @@ func getEventsForAdmin() ([]*Event, error) {
 	_ = rows.Close()
 
 	for i, v := range events {
-
 		event, err := getEventForAdmin(v, tx)
 		if err != nil {
+			_ = tx.Rollback()
 			return nil, err
 		}
 		events[i] = event
 	}
+
+	_ = tx.Rollback()
+
 	return events, nil
 }
 
@@ -285,8 +289,6 @@ func getEventForAdmin(event *Event, tx *sql.Tx) (*Event, error) {
 		event.Remains--
 		event.Sheets[sheet.Rank].Remains--
 	}
-
-	_ = tx.Rollback()
 
 	return event, nil
 }
