@@ -85,7 +85,7 @@ type Administrator struct {
 }
 
 type SheetConfig struct {
-	ID int64
+	ID    int64
 	Count int64
 	Price int64
 }
@@ -245,13 +245,12 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 
 	for _, s := range DefaultSheets {
 		var sheet = Sheet{
-			ID: s.ID,
-			Rank: s.Rank,
-			Num: s.Num,
+			ID:    s.ID,
+			Rank:  s.Rank,
+			Num:   s.Num,
 			Price: s.Price,
-
 		}
- 		event.Total++
+		event.Total++
 		event.Sheets[sheet.Rank].Total++
 		event.Sheets[sheet.Rank].Remains++
 		event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
@@ -364,9 +363,9 @@ func main() {
 		c := SheetConfigs[rank]
 		for num := int64(1); num <= c.Count; num++ {
 			DefaultSheets = append(DefaultSheets, &Sheet{
-				ID: c.ID + num - 1,
-				Rank: rank,
-				Num: num,
+				ID:    c.ID + num - 1,
+				Rank:  rank,
+				Num:   num,
 				Price: c.Price,
 			})
 		}
@@ -690,20 +689,14 @@ func main() {
 			return err
 		}
 
-		event, err := getEvent(eventID, user.ID)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return resError(c, "invalid_event", 404)
-			}
-			return err
-		} else if !event.PublicFg {
+		var eventId int64
+		if err := db.QueryRow("SELECT id FROM events where id = ? and public_fg = 1", eventID).Scan(&eventId); err != nil {
 			return resError(c, "invalid_event", 404)
 		}
 
 		if !validateRank(rank) {
 			return resError(c, "invalid_rank", 404)
 		}
-
 
 		sc, ok := SheetConfigs[rank]
 		if !ok {
@@ -718,7 +711,7 @@ func main() {
 		sheetId := sc.ID + numInt - 1
 
 		var reservation Reservation
-		if err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id HAVING reserved_at = MIN(reserved_at)", event.ID, sheetId).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt); err != nil {
+		if err := db.QueryRow("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id HAVING reserved_at = MIN(reserved_at)", eventID, sheetId).Scan(&reservation.ID, &reservation.EventID, &reservation.SheetID, &reservation.UserID, &reservation.ReservedAt, &reservation.CanceledAt); err != nil {
 			if err == sql.ErrNoRows {
 				return resError(c, "not_reserved", 400)
 			}
@@ -728,23 +721,7 @@ func main() {
 			return resError(c, "not_permitted", 403)
 		}
 
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-
-		_, err = tx.Exec("SELECT id FROM reservations where id = ? for update", reservation.ID)
-		if err != nil {
-			tx.Rollback()
-			log.Println("re-try: rollback by", err)
-		}
-
-		if _, err := tx.Exec("UPDATE reservations SET canceled_at = ? WHERE id = ?", time.Now().UTC().Format("2006-01-02 15:04:05.000000"), reservation.ID); err != nil {
-			tx.Rollback()
-			return err
-		}
-
-		if err := tx.Commit(); err != nil {
+		if _, err := db.Exec("UPDATE reservations SET canceled_at = ? WHERE id = ?", time.Now().UTC().Format("2006-01-02 15:04:05.000000"), reservation.ID); err != nil {
 			return err
 		}
 
@@ -813,7 +790,6 @@ func main() {
 			Price  int    `json:"price"`
 		}
 		c.Bind(&params)
-
 
 		res, err := db.Exec("INSERT INTO events (title, public_fg, closed_fg, price) VALUES (?, ?, 0, ?)", params.Title, params.Public, params.Price)
 		if err != nil {
@@ -933,7 +909,7 @@ func main() {
 		return renderReportCSV(c, reports)
 	}, adminLoginRequired)
 	e.GET("/admin/api/reports/sales", func(c echo.Context) error {
-		rows, err := db.Query("select r.*, s.rank as sheet_rank, s.num as sheet_num, s.price as sheet_price, e.id as event_id, e.price as event_price from reservations r inner join sheets s on s.id = r.sheet_id inner join events e on e.id = r.event_id order by reserved_at asc for update")
+		rows, err := db.Query("select r.*, s.rank as sheet_rank, s.num as sheet_num, s.price as sheet_price, e.id as event_id, e.price as event_price from reservations r inner join sheets s on s.id = r.sheet_id inner join events e on e.id = r.event_id order by reserved_at asc")
 		if err != nil {
 			return err
 		}
