@@ -85,7 +85,7 @@ type Administrator struct {
 }
 
 type SheetConfig struct {
-	ID int64
+	ID    int64
 	Count int64
 	Price int64
 }
@@ -245,13 +245,12 @@ func getEvent(eventID, loginUserID int64) (*Event, error) {
 
 	for _, s := range DefaultSheets {
 		var sheet = Sheet{
-			ID: s.ID,
-			Rank: s.Rank,
-			Num: s.Num,
+			ID:    s.ID,
+			Rank:  s.Rank,
+			Num:   s.Num,
 			Price: s.Price,
-
 		}
- 		event.Total++
+		event.Total++
 		event.Sheets[sheet.Rank].Total++
 		event.Sheets[sheet.Rank].Remains++
 		event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
@@ -364,9 +363,9 @@ func main() {
 		c := SheetConfigs[rank]
 		for num := int64(1); num <= c.Count; num++ {
 			DefaultSheets = append(DefaultSheets, &Sheet{
-				ID: c.ID + num - 1,
-				Rank: rank,
-				Num: num,
+				ID:    c.ID + num - 1,
+				Rank:  rank,
+				Num:   num,
 				Price: c.Price,
 			})
 		}
@@ -791,7 +790,6 @@ func main() {
 			Price  int    `json:"price"`
 		}
 		c.Bind(&params)
-
 
 		res, err := db.Exec("INSERT INTO events (title, public_fg, closed_fg, price) VALUES (?, ?, 0, ?)", params.Title, params.Public, params.Price)
 		if err != nil {
