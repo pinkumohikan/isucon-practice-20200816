@@ -200,7 +200,12 @@ func getLoginAdministrator(c echo.Context) (*Administrator, error) {
 }
 
 func getEventsForAdmin() ([]*Event, error) {
-	rows, err := db.Query("SELECT * FROM events ORDER BY id ASC")
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := tx.Query("SELECT * FROM events ORDER BY id ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +221,8 @@ func getEventsForAdmin() ([]*Event, error) {
 	_ = rows.Close()
 
 	for i, v := range events {
-		event, err := getEventForAdmin(v)
+
+		event, err := getEventForAdmin(v, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +231,7 @@ func getEventsForAdmin() ([]*Event, error) {
 	return events, nil
 }
 
-func getEventForAdmin(event *Event) (*Event, error) {
+func getEventForAdmin(event *Event, tx *sql.Tx) (*Event, error) {
 	event.Sheets = map[string]*Sheets{
 		"S": &Sheets{},
 		"A": &Sheets{},
@@ -249,7 +255,7 @@ func getEventForAdmin(event *Event) (*Event, error) {
 
 	event.Remains = event.Total
 
-	rows, err := db.Query("SELECT id, event_id, sheet_id, user_id, reserved_at FROM reservations WHERE event_id = ? AND canceled_at IS NULL GROUP BY sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID)
+	rows, err := tx.Query("SELECT id, event_id, sheet_id, user_id, reserved_at FROM reservations WHERE event_id = ? AND canceled_at IS NULL GROUP BY sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -279,6 +285,8 @@ func getEventForAdmin(event *Event) (*Event, error) {
 		event.Remains--
 		event.Sheets[sheet.Rank].Remains--
 	}
+
+	_ = tx.Rollback()
 
 	return event, nil
 }
