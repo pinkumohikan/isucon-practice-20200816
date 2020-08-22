@@ -722,7 +722,7 @@ func main() {
 			return resError(c, "not_permitted", 403)
 		}
 
-		if _, err := db.Exec("UPDATE reservations SET canceled_at = ? WHERE id = ? and canceled_at is null", time.Now().UTC().Format("2006-01-02 15:04:05.000000"), reservation.ID); err != nil {
+		if _, err := db.Exec("UPDATE reservations SET canceled_at = ? WHERE id = ?", time.Now().UTC().Format("2006-01-02 15:04:05.000000"), reservation.ID); err != nil {
 			return err
 		}
 
