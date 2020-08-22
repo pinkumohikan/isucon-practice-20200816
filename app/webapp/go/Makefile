@@ -6,4 +6,4 @@ clean:
 
 .PHONY: build
 build:
-	go build -v -o torb src/torb/app.go src/torb/trace.go
+	go build -v -o torb src/torb/app.go

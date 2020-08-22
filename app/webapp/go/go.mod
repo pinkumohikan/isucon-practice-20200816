@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go v0.63.0
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.2
 	contrib.go.opencensus.io/integrations/ocsql v0.1.6
+	github.com/ahmetb/go-linq v3.0.0+incompatible // indirect
 	github.com/go-sql-driver/mysql v0.0.0-20180719071942-99ff426eb706
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/gorilla/sessions v0.0.0-20180606155211-03b6f63cc43e
