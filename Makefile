@@ -8,6 +8,7 @@ gogo:
 	sudo truncate --size 0 /var/log/nginx/access.log
 	ssh isucon-app-3 sudo truncate --size 0 /var/lib/mysql/mysql-slow.log
 	make -C app/webapp/go build
+	scp app/webapp/go/torb isucon-app-1:/home/isucon/isucon-practice-20200816/app/webapp/go/
 	sleep 2
 	sudo systemctl start torb.go
 	ssh isucon-app-3 sudo systemctl start mariadb.service
