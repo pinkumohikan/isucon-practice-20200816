@@ -5,7 +5,7 @@ gogo:
 	sudo systemctl stop torb.go
 	ssh isucon-app-1 sudo systemctl stop torb.go
 	ssh isucon-app-3 sudo systemctl stop mariadb.service
-	sudo truncate --size 0 /var/log/h2o/access.log
+	sudo truncate --size 0 /var/log/nginx/access.log
 	ssh isucon-app-3 sudo truncate --size 0 /var/lib/mysql/mysql-slow.log
 	make -C app/webapp/go build
 	sleep 2
