@@ -23,6 +23,8 @@ import (
 	"github.com/labstack/echo/middleware"
 )
 
+var ReportFetchingCount = 0
+
 type User struct {
 	ID        int64  `json:"id,omitempty"`
 	Nickname  string `json:"nickname,omitempty"`
@@ -879,11 +881,16 @@ func main() {
 			return err
 		}
 
+		time.Sleep(time.Second * time.Duration(2 * ReportFetchingCount))
+		ReportFetchingCount++
+
 		rows, err := db.Query("SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, e.price AS event_price FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE", event.ID)
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
+
+		ReportFetchingCount--
 
 		var reports []Report
 		for rows.Next() {
@@ -906,6 +913,7 @@ func main() {
 			}
 			reports = append(reports, report)
 		}
+
 		return renderReportCSV(c, reports)
 	}, adminLoginRequired)
 	e.GET("/admin/api/reports/sales", func(c echo.Context) error {
