@@ -690,7 +690,8 @@ func main() {
 			return err
 		}
 
-		if err := db.QueryRow("SELECT id FROM events where id = ? and public_fg = 1", eventID).Err(); err != nil {
+		var eventId int64
+		if err := db.QueryRow("SELECT id FROM events where id = ? and public_fg = 1", eventID).Scan(&eventId); err != nil {
 			return resError(c, "invalid_event", 404)
 		}
 
