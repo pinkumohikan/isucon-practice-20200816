@@ -199,6 +199,90 @@ func getLoginAdministrator(c echo.Context) (*Administrator, error) {
 	return &administrator, err
 }
 
+func getEventsForAdmin() ([]*Event, error) {
+	rows, err := db.Query("SELECT * FROM events ORDER BY id ASC")
+	if err != nil {
+		return nil, err
+	}
+
+	var events []*Event
+	for rows.Next() {
+		var event Event
+		if err := rows.Scan(&event.ID, &event.Title, &event.PublicFg, &event.ClosedFg, &event.Price); err != nil {
+			return nil, err
+		}
+		events = append(events, &event)
+	}
+	_ = rows.Close()
+
+	for i, v := range events {
+		event, err := getEventForAdmin(v)
+		if err != nil {
+			return nil, err
+		}
+		events[i] = event
+	}
+	return events, nil
+}
+
+func getEventForAdmin(event *Event) (*Event, error) {
+	event.Sheets = map[string]*Sheets{
+		"S": &Sheets{},
+		"A": &Sheets{},
+		"B": &Sheets{},
+		"C": &Sheets{},
+	}
+
+	for _, s := range DefaultSheets {
+		var sheet = Sheet{
+			ID:    s.ID,
+			Rank:  s.Rank,
+			Num:   s.Num,
+			Price: s.Price,
+		}
+		event.Total++
+		event.Sheets[sheet.Rank].Total++
+		event.Sheets[sheet.Rank].Remains++
+		event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
+		event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
+	}
+
+	event.Remains = event.Total
+
+	rows, err := db.Query("SELECT id, event_id, sheet_id, user_id, reserved_at FROM reservations WHERE event_id = ? AND canceled_at IS NULL GROUP BY sheet_id HAVING reserved_at = MIN(reserved_at)", event.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var rs []Reservation
+	for rows.Next() {
+		var r Reservation
+		if err := rows.Scan(&r.ID, &r.EventID, &r.SheetID, &r.UserID, &r.ReservedAt); err != nil {
+			return nil, err
+		}
+		rs = append(rs, r)
+	}
+	_ = rows.Close()
+
+	for _, r := range rs {
+		var sheet Sheet
+		for _, s := range DefaultSheets {
+			if s.ID == r.SheetID {
+				sheet = *s
+				break
+			}
+		}
+
+		sheet.Reserved = true
+		sheet.ReservedAtUnix = r.ReservedAt.Unix()
+
+		event.Remains--
+		event.Sheets[sheet.Rank].Remains--
+	}
+
+	return event, nil
+}
+
 func getEvents(all bool) ([]*Event, error) {
 	rows, err := db.Query("SELECT * FROM events ORDER BY id ASC")
 	if err != nil {
@@ -734,7 +818,7 @@ func main() {
 		administrator := c.Get("administrator")
 		if administrator != nil {
 			var err error
-			if events, err = getEvents(true); err != nil {
+			if events, err = getEventsForAdmin(); err != nil {
 				return err
 			}
 		}
