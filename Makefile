@@ -10,8 +10,8 @@ gogo:
 	make -C app/webapp/go build
 	sleep 2
 	sudo systemctl start torb.go
-	ssh isucon-app-1 sudo systemctl start torb.go
 	ssh isucon-app-3 sudo systemctl start mariadb.service
+	ssh isucon-app-1 sudo systemctl start torb.go
 	sudo systemctl start nginx
 	sleep 2
 	./app/exec_bench.sh
