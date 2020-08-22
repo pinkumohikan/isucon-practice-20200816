@@ -650,12 +650,6 @@ func main() {
 			if err != nil {
 				return err
 			}
-			_, err = tx.Exec("SELECT id FROM reservations where id = ? for update", reservationID)
-			if err != nil {
-				tx.Rollback()
-				log.Println("re-try: rollback by", err)
-				continue
-			}
 
 			res, err := tx.Exec("INSERT INTO reservations (event_id, sheet_id, user_id, reserved_at) VALUES (?, ?, ?, ?)", event.ID, sheet.ID, user.ID, time.Now().UTC().Format("2006-01-02 15:04:05.000000"))
 			if err != nil {
