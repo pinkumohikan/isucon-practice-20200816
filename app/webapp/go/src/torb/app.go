@@ -450,6 +450,7 @@ func main() {
 			return err
 		}
 		if user.ID != loginUser.ID {
+			log.Printf("access violation! owner:%d accessed:%d", user.ID, loginUser.ID)
 			return resError(c, "forbidden", 403)
 		}
 
@@ -718,6 +719,7 @@ func main() {
 			return err
 		}
 		if reservation.UserID != user.ID {
+			log.Printf("access violation! owner:%d reserved:%d", user.ID, reservation.ID)
 			return resError(c, "not_permitted", 403)
 		}
 
