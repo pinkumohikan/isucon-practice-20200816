@@ -11,13 +11,13 @@ gogo:
 	sleep 2
 	sudo systemctl start torb.go
 	ssh isucon-app-1 sudo systemctl start torb.go
-	sudo systemctl start nginx
 	ssh isucon-app-3 sudo systemctl start mariadb.service
+	sudo systemctl start nginx
 	sleep 2
 	./app/exec_bench.sh
 
 kataribe:
-	sudo cat /var/log/h2o/access.log | ./kataribe 
+	sudo cat /var/log/nginx/access.log | ./kataribe
 
 slow-log:
 	sudo mysqldumpslow -s at -t 10 /var/lib/mysql/mysql-slow.log
