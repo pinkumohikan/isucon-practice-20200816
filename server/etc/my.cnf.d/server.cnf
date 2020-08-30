@@ -11,6 +11,10 @@
 # this is only for the mysqld standalone daemon
 [mysqld]
 #Slow query
+slow_query_log = 1
+slow_query_log_file = /var/lib/mysql/mysql-slow.log
+long_query_time = 1
+log-queries-not-using-indexes = 0
 
 # this is only for embedded server
 [embedded]
