@@ -214,19 +214,82 @@ func getEvents(all bool) ([]*Event, error) {
 		if !all && !event.PublicFg {
 			continue
 		}
+		for _, s := range DefaultSheets {
+			var sheet = Sheet{
+				ID:    s.ID,
+				Rank:  s.Rank,
+				Num:   s.Num,
+				Price: s.Price,
+			}
+			event.Total++
+			event.Sheets[sheet.Rank].Total++
+			event.Sheets[sheet.Rank].Remains++
+			event.Sheets[sheet.Rank].Detail = append(event.Sheets[sheet.Rank].Detail, &sheet)
+			event.Sheets[sheet.Rank].Price = event.Price + sheet.Price
+		}
+		event.Remains = event.Total
 		events = append(events, &event)
 	}
 	_ = rows.Close()
 
-	for i, v := range events {
-		event, err := getEvent(v.ID, -1)
-		if err != nil {
+	var eventids []int64
+	for _, e := range events {
+		eventids = append(eventids, e.ID)
+	}
+
+	// reservationを取ってくる
+	rows, err = db.Query("SELECT id, event_id, sheet_id, user_id, reserved_at FROM reservations WHERE event_id IN (?) AND canceled_at IS NULL GROUP BY sheet_id HAVING reserved_at = MIN(reserved_at)", eventids)
+	if err != nil {
+		return nil, err
+	}
+
+	var rs []Reservation
+	for rows.Next() {
+		var r Reservation
+		if err := rows.Scan(&r.ID, &r.EventID, &r.SheetID, &r.UserID, &r.ReservedAt); err != nil {
 			return nil, err
 		}
-		for k := range event.Sheets {
-			event.Sheets[k].Detail = nil
+		rs = append(rs, r)
+	}
+	// ここでreservationsができてる
+	_ = rows.Close()
+
+	// detailを作る
+	var detail = map[string]*Sheet{
+		"S": &Sheet{},
+		"A": &Sheet{},
+		"B": &Sheet{},
+		"C": &Sheet{},
+	}
+	for _, r := range rs {
+		var sheet Sheet
+		sheet.Mine = r.UserID == -1
+		sheet.Reserved = true
+		sheet.ReservedAt = r.ReservedAt
+		sheet.ReservedAtUnix = r.ReservedAt.Unix()
+
+		for _, s := range DefaultSheets {
+			if s.ID == r.SheetID {
+				sheet = *s
+				detail[s.Rank] = append(detail[s.Rank], &sheet)
+				break
+			}
 		}
-		events[i] = event
+
+		for _, e := range events {
+			if e.ID == r.EventID {
+				e.Remains--
+				e.Sheets[r.SheetRank].Remains--
+				break
+			}
+		}
+	}
+
+	for i, v := range events {
+		for k := range v.Sheets {
+			v.Sheets[k].Detail = detail[k]
+		}
+		events[i] = v
 	}
 	return events, nil
 }
